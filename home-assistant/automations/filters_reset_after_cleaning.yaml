@@ -1,0 +1,67 @@
+id: '1790041727420'
+alias: Filters - reset after cleaning
+description: Resets the runtime hours to 0 and sets last-cleaned to now when the AC/PC 'filter cleaned' button is pressed on the dashboard or the 'Mark as cleaned' action is tapped on the phone notification. Also clears the notification.
+triggers:
+- trigger: state
+  entity_id: input_button.ac_filter_cleaned
+  not_to:
+  - unavailable
+  - unknown
+  id: ac
+- trigger: event
+  event_type: mobile_app_notification_action
+  event_data:
+    action: AC_FILTER_CLEANED
+  id: ac
+- trigger: state
+  entity_id: input_button.pc_filter_cleaned
+  not_to:
+  - unavailable
+  - unknown
+  id: pc
+- trigger: event
+  event_type: mobile_app_notification_action
+  event_data:
+    action: PC_FILTER_CLEANED
+  id: pc
+actions:
+- choose:
+  - conditions:
+    - condition: trigger
+      id: ac
+    sequence:
+    - action: input_number.set_value
+      target:
+        entity_id: input_number.ac_filter_runtime_hours
+      data:
+        value: 0
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.ac_filter_last_cleaned
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+    - action: notify.mobile_app_my_phone
+      data:
+        message: clear_notification
+        data:
+          tag: ac_filter_reminder
+  - conditions:
+    - condition: trigger
+      id: pc
+    sequence:
+    - action: input_number.set_value
+      target:
+        entity_id: input_number.pc_filter_runtime_hours
+      data:
+        value: 0
+    - action: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.pc_filter_last_cleaned
+      data:
+        datetime: '{{ now().strftime(''%Y-%m-%d %H:%M:%S'') }}'
+    - action: notify.mobile_app_my_phone
+      data:
+        message: clear_notification
+        data:
+          tag: pc_filter_reminder
+mode: queued

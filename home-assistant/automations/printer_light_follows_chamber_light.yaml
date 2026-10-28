@@ -1,0 +1,25 @@
+id: '1780819315656'
+alias: Printer room light follows printer chamber light
+triggers:
+- trigger: state
+  entity_id: light.p1s_<printer_serial>_chamber_light
+conditions: []
+actions:
+- choose:
+  - conditions:
+    - condition: state
+      entity_id: light.p1s_<printer_serial>_chamber_light
+      state: 'on'
+    sequence:
+    - action: light.turn_on
+      target:
+        entity_id: light.quarto_novadigital_switch_luz_printer
+  - conditions:
+    - condition: state
+      entity_id: light.p1s_<printer_serial>_chamber_light
+      state: 'off'
+    sequence:
+    - action: light.turn_off
+      target:
+        entity_id: light.quarto_novadigital_switch_luz_printer
+mode: single

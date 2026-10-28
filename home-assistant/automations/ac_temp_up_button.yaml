@@ -1,0 +1,15 @@
+id: '1788638767515'
+alias: A/C Temp Up Button Logic
+triggers:
+- trigger: state
+  entity_id: input_button.temp_up
+actions:
+- action: climate.set_temperature
+  target:
+    entity_id: climate.air_conditioner_613a94_air_conditioner
+  data:
+    temperature: '{{ (state_attr(''climate.air_conditioner_613a94_air_conditioner'', ''temperature'') | float(20)) + 1 }}'
+- action: notify.mobile_app_my_phone
+  data:
+    message: update_widgets
+mode: single

@@ -1,0 +1,29 @@
+id: '1790041697366'
+alias: Filters - runtime tracker
+description: Every 15 min, adds 0.25 h to the AC filter counter if the AC is running (any mode except off) and to the PC filter counter if the main PC is on. Used for filter-cleaning reminders.
+triggers:
+- trigger: time_pattern
+  minutes: /15
+actions:
+- if:
+  - condition: not
+    conditions:
+    - condition: state
+      entity_id: climate.air_conditioner_613a94_air_conditioner
+      state:
+      - 'off'
+      - unavailable
+      - unknown
+  then:
+  - action: input_number.increment
+    target:
+      entity_id: input_number.ac_filter_runtime_hours
+- if:
+  - condition: state
+    entity_id: switch.main_pc_controller
+    state: 'on'
+  then:
+  - action: input_number.increment
+    target:
+      entity_id: input_number.pc_filter_runtime_hours
+mode: single

@@ -1,0 +1,49 @@
+id: '1790041716599'
+alias: Filters - cleaning reminder
+description: Daily at 19:00, sends a phone notification if the AC filter reached 250 running hours or 30 days since last cleaning, or if the PC filters reached 500 running hours or 90 days. Repeats daily until marked as cleaned. Notification has an actionable 'Mark as cleaned' button handled by 'Filters - reset after cleaning'.
+triggers:
+- trigger: time
+  at: '19:00:00'
+actions:
+- if:
+  - condition: or
+    conditions:
+    - condition: numeric_state
+      entity_id: input_number.ac_filter_runtime_hours
+      above: 249.9
+    - condition: template
+      value_template: '{{ ac_days >= 30 }}'
+  then:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: 🧹 Clean the AC filter
+      message: '{{ ac_hours | round(0) | int }} h of use / {{ ac_days }} days since last cleaning.'
+      data:
+        tag: ac_filter_reminder
+        actions:
+        - action: AC_FILTER_CLEANED
+          title: Mark as cleaned
+- if:
+  - condition: or
+    conditions:
+    - condition: numeric_state
+      entity_id: input_number.pc_filter_runtime_hours
+      above: 499.9
+    - condition: template
+      value_template: '{{ pc_days >= 90 }}'
+  then:
+  - action: notify.mobile_app_my_phone
+    data:
+      title: 🧹 Clean the PC filters
+      message: '{{ pc_hours | round(0) | int }} h of use / {{ pc_days }} days since last cleaning.'
+      data:
+        tag: pc_filter_reminder
+        actions:
+        - action: PC_FILTER_CLEANED
+          title: Mark as cleaned
+mode: single
+variables:
+  ac_hours: '{{ states(''input_number.ac_filter_runtime_hours'') | float(0) }}'
+  pc_hours: '{{ states(''input_number.pc_filter_runtime_hours'') | float(0) }}'
+  ac_days: '{{ ((now().timestamp() - as_timestamp(states(''input_datetime.ac_filter_last_cleaned''), now().timestamp())) / 86400) | int }}'
+  pc_days: '{{ ((now().timestamp() - as_timestamp(states(''input_datetime.pc_filter_last_cleaned''), now().timestamp())) / 86400) | int }}'

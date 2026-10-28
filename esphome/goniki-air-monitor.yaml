@@ -1,0 +1,277 @@
+esphome:
+  name: goniki-air-monitor
+  friendly_name: GoNiki Air Monitor
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: wake_screen_script
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  reboot_timeout: 15min
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "America/Sao_Paulo"
+
+# --- Fonts & Colors ---
+font:
+  - file: "gfonts://Roboto"
+    id: font_title
+    size: 16
+  - file: "gfonts://Roboto"
+    id: font_data
+    size: 13 
+
+color:
+  - id: color_white
+    red: 100%
+    green: 100%
+    blue: 100%
+  - id: color_black
+    red: 0%
+    green: 0%
+    blue: 0%
+  - id: color_gray
+    red: 50%
+    green: 50%
+    blue: 50%
+  - id: color_blue
+    red: 20%
+    green: 60%
+    blue: 100%
+  - id: color_green
+    red: 20%
+    green: 90%
+    blue: 20%
+  - id: color_red
+    red: 100%
+    green: 30%
+    blue: 30%
+  - id: color_yellow
+    red: 100%
+    green: 90%
+    blue: 10%
+  - id: color_orange
+    red: 100%
+    green: 60%
+    blue: 10%
+  - id: color_cyan
+    red: 10%
+    green: 80%
+    blue: 100%
+
+# --- Communication Buses ---
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+  id: bus_a
+
+uart:
+  rx_pin: GPIO16
+  tx_pin: GPIO17
+  baud_rate: 9600
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+# --- Display & UI Configuration ---
+
+display:
+  - platform: st7789v
+    id: my_display
+    model: custom
+    height: 240
+    width: 135
+    offset_height: 40
+    offset_width: 52
+    cs_pin: GPIO25
+    dc_pin: GPIO26
+    reset_pin: GPIO27
+    rotation: 90
+    update_interval: 1s 
+    lambda: |-
+      // Fill background
+      it.fill(id(color_black));
+      
+      // Header
+      it.printf(0, 0, id(font_title), id(color_blue), "Air Quality Sensor");
+      
+      // Dynamic 4-Bar Battery Logic 
+      if (id(bat_raw_100).state > 0.8) {
+        it.printf(180, 0, id(font_title), id(color_green), "[||||]"); 
+      } 
+      else if (id(bat_raw_75).state > 0.8) {
+        it.printf(180, 0, id(font_title), id(color_green), "[||| ]"); 
+      } 
+      else if (id(bat_raw_50).state > 0.8) {
+        it.printf(180, 0, id(font_title), id(color_yellow), "[||  ]"); 
+      } 
+      else if (id(bat_raw_25).state > 0.8) {
+        it.printf(180, 0, id(font_title), id(color_orange), "[|   ]"); 
+      } 
+      else {
+        it.printf(180, 0, id(font_title), id(color_red), "[    ]"); 
+      }
+
+      // --- LEFT COLUMN (Environment) ---
+      if (id(temp_sensor).has_state()) {
+        it.printf(0, 25, id(font_data), id(color_orange), "Temp: %.1f C", id(temp_sensor).state);
+        it.printf(0, 45, id(font_data), id(color_cyan), "Hum: %.1f %%", id(hum_sensor).state);
+      }
+
+      if (id(voc_index).has_state()) {
+        it.printf(0, 70, id(font_data), id(color_green), "VOC: %.0f", id(voc_index).state);
+        it.printf(0, 90, id(font_data), id(color_red), "NOx: %.0f", id(nox_index).state);
+      } else {
+        it.printf(0, 70, id(font_data), id(color_gray), "VOC: Heating...");
+        it.printf(0, 90, id(font_data), id(color_gray), "NOx: Heating...");
+      }
+
+      // --- RIGHT COLUMN (Particle Counts) ---
+      if (id(pm_0_3_c).has_state()) {
+        it.printf(125, 25, id(font_data), id(color_yellow), "PM0.3: %.0f", id(pm_0_3_c).state);
+        it.printf(125, 43, id(font_data), id(color_yellow), "PM0.5: %.0f", id(pm_0_5_c).state);
+        it.printf(125, 61, id(font_data), id(color_yellow), "PM1.0: %.0f", id(pm_1_0_c).state);
+        it.printf(125, 79, id(font_data), id(color_yellow), "PM2.5: %.0f", id(pm_2_5_c).state);
+        it.printf(125, 97, id(font_data), id(color_yellow), "PM5.0: %.0f", id(pm_5_0_c).state);
+        it.printf(125, 115, id(font_data), id(color_yellow), "PM10: %.0f", id(pm_10_0_c).state);
+      }
+
+# --- Screen Backlight & Wake Button ---
+
+switch:
+  - platform: gpio
+    pin: GPIO32
+    id: screen_backlight
+    name: "Screen Backlight"
+    restore_mode: ALWAYS_ON 
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO33
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Wake Button"
+    internal: true 
+    on_press:
+      - script.execute: wake_screen_script
+
+# --- Automation Scripts ---
+
+script:
+  - id: wake_screen_script
+    mode: restart
+    then:
+      - switch.turn_on: screen_backlight
+      - component.update: my_display
+      - delay: 30s
+      - switch.turn_off: screen_backlight
+
+# --- Sensor Definitions ---
+
+sensor:
+  # Environment Sensors
+  - platform: sht3xd
+    temperature:
+      name: "Ambient Temperature"
+      id: temp_sensor
+    humidity:
+      name: "Ambient Humidity"
+      id: hum_sensor 
+    address: 0x44
+    update_interval: 60s
+
+  - platform: sgp4x
+    voc:
+      name: "VOC Index"
+      id: voc_index
+    nox:
+      name: "NOx Index"
+      id: nox_index 
+    compensation:
+      temperature_source: temp_sensor 
+      humidity_source: hum_sensor
+
+  # Particle Sensor (Corrected to use 'um' instead of 'count')
+  - platform: pmsx003
+    type: PMSX003
+    pm_0_3um:
+      name: "PM0.3 Count"
+      id: pm_0_3_c
+    pm_0_5um:
+      name: "PM0.5 Count"
+      id: pm_0_5_c
+    pm_1_0um:
+      name: "PM1.0 Count"
+      id: pm_1_0_c
+    pm_2_5um:
+      name: "PM2.5 Count"
+      id: pm_2_5_c
+    pm_5_0um:
+      name: "PM5.0 Count"
+      id: pm_5_0_c
+    pm_10_0um:
+      name: "PM10.0 Count"
+      id: pm_10_0_c
+
+  # Battery Voltage Readers (Smoothed out with filters)
+  - platform: adc
+    pin: GPIO34
+    id: bat_raw_25
+    attenuation: 11db
+    update_interval: 100ms
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 15
+          send_every: 10
+
+  - platform: adc
+    pin: GPIO35
+    id: bat_raw_50
+    attenuation: 11db
+    update_interval: 100ms
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 15
+          send_every: 10
+
+  - platform: adc
+    pin: GPIO36
+    id: bat_raw_75
+    attenuation: 11db
+    update_interval: 100ms
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 15
+          send_every: 10
+
+  - platform: adc
+    pin: GPIO39
+    id: bat_raw_100
+    attenuation: 11db
+    update_interval: 100ms
+    internal: true
+    filters:
+      - sliding_window_moving_average:
+          window_size: 15
+          send_every: 10
